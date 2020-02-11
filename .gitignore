@@ -1,0 +1,5 @@
+/examples/*.pdf
+/examples/*.json
+__pycache__
+/source/zool/Zool.egg-info/
+/source/zool/__pycache__/

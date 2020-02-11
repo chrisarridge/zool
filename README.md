@@ -15,7 +15,7 @@ triangle-type plot).
 Using setup tools launch `python setup.py install`.
 
 ## Licence
-Copyright (C) 2017-2019 Chris Arridge and Lancaster University
+Copyright (C) 2017-2020 Chris Arridge and Lancaster University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
@@ -30,12 +30,12 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ## Basic Usage
-A plot is created by creating a `zool.Plot` object.  The width and height can
+A plot is created by creating a `zool.Figure` object.  The width and height can
 be set.  In this example we will create a plot that has a fixed width of 10 cm
 (not including left and right margins) and the height of the plot is determined
 from the height of all the child elements (and any padding that is added).
 
-	fig = zool.Plot(width=zool.Fixed(10.0), height=zool.FromChildren(),
+	fig = zool.Figure(width=zool.Fixed(10.0), height=zool.FromChildren(),
 				layout='vertical', padding=0.5,
 				margin_left=2, margin_right=2)
 
@@ -48,12 +48,12 @@ width comes from the parent element:
 	fig.add('base',width=zool.FromParent(), height=zool.Fixed(5.0))
 	fig.add('base',width=zool.FromParent(), height=zool.Fixed(5.0))
 
-The plot is then laid out (the constraints solved) using the ``zool.Plot.layout`` method.  We can get a preview of the plot using the ``zool.Plot.preview`` method.
+The plot is then laid out (the constraints solved) using the ``zool.Figure.layout`` method.  We can get a preview of the plot using the ``zool.Figure.preview`` method.
 
 	fig.layout()
 	fig.preview()
 
-To make these plots we can then call ``zool.Plot.new`` and then each axis can be obtained using ``zool.Plot.axes``.
+To make these plots we can then call ``zool.Figure.new`` and then each axis can be obtained using ``zool.Figure.axes``.
 
 	fig.new()
 	ax = fig.axes['0']
@@ -61,7 +61,7 @@ To make these plots we can then call ``zool.Plot.new`` and then each axis can be
 	plt.show()
 
 ## Licence
-Copyright (C) 2019 Chris Arridge and Lancaster University
+Copyright (C) 2017-2020 Chris Arridge and Lancaster University
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software

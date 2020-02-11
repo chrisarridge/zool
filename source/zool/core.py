@@ -1,4 +1,4 @@
-""" This module implements a layout engine for plots.
+""" Core definitions.
 """
 
 # Required standard packages
@@ -7,7 +7,8 @@ import matplotlib.patches
 import matplotlib.colors
 import enum
 import collections
-
+import kiwisolver as ks
+import json
 # KiwiSolver for constraint programming.
 import kiwisolver as ks
 
@@ -27,6 +28,13 @@ class Fixed:
 	@property
 	def size(self):
 		return self._size
+
+class FixedAspect:
+	def __init__(self, s):
+		self._aspect = s
+	@property
+	def aspect(self):
+		return self._aspect
 
 class FromChildren:
 	def __init__(self):
@@ -48,6 +56,81 @@ class Named:
 	def id(self):
 		return self._id
 
+def _constraint_serialiser(v):
+	"""Helper function to turn constraints into something that can be serialised"""
+	if isinstance(v, Fixed):
+		return {'constraint':'fixedDimension', 'value':v.size}
+	elif isinstance(v, FixedAspect):
+		return {'constraint':'fixedAspectRatio', 'value':v.aspect}
+	elif isinstance(v, FromChildren):
+		return {'constraint':'fromChildren'}
+	elif isinstance(v, FromParent):
+		return {'constraint':'fromParent'}
+	elif isinstance(v, Fill):
+		return {'constraint':'fill'}
+	elif isinstance(v, Named):
+		return {'constraint':'named', 'value':v.id}
+	else:
+		raise ValueError('Unknown constraint type')
+
+
+
+def _constraint_deserialiser(v):
+	"""Helper function to turn serialised constraints back into constraints"""
+	if not isinstance(v, dict):
+		raise ValueError('Supplied variable is not a dictionary')
+	if 'constraint' not in v:
+		raise ValueError('Supplied dictionary does not have a "constraint" entry')
+
+	if v['constraint']=='fixedDimension':
+		if 'value' not in v:
+			raise ValueError('Require a value for a fixedDimension constraint')
+		else:
+			return Fixed(float(v['value']))
+	elif v['constraint']=='fixedAspectRatio':
+		if 'value' not in v:
+			raise ValueError('Require a value for a fixedAspectRatio constraint')
+		else:
+			return FixedAspect(float(v['value']))
+	elif v['constraint']=='named':
+		if 'value' not in v:
+			raise ValueError('Require a panel id for a named width/height constraint')
+		else:
+			return Named(v['value'])
+	elif v['constraint']=='fill':
+		return Fill()
+	elif v['constraint']=='fromChildren':
+		return FromChildren()
+	elif v['constraint']=='fromParent':
+		return FromParent()
+	else:
+		raise UserError('Unknown constraint type <{}>'.format(v['constraint']))
+
+
+## ========================================================================
+##
+## Exceptions
+##
+## ========================================================================
+class ZoolError(Exception):
+	"""Base class for Zool exceptions."""
+	pass
+
+class InappropriateConstraint(ZoolError):
+	"""Exception raised for errors in the constraints provided.
+
+	Attributes:
+		:param: constraint str: Constraint provided.
+		:param: label str: Label that the constraint was provided to
+		:param: message str: Message.
+	"""
+
+	def __init__(self, constraint, label, message):
+		self.constraint = constraint
+		self.label = label
+		self.message = message
+
+
 
 
 ## ========================================================================
@@ -62,20 +145,18 @@ class PlotElement(object):
 		"""Default constructor.
 		"""
 		# Margins.
-		self.margin_left = ks.Variable()
-		self.margin_right = ks.Variable()
-		self.margin_top = ks.Variable()
-		self.margin_bottom = ks.Variable()
+		self.margin_left = 0
+		self.margin_right = 0
+		self.margin_top = 0
+		self.margin_bottom = 0
 
 		# Dimensions of the element. We also have some flags so that we can
 		# determine if the dimensions have been properly set yet, and where
 		# the dimension information originates.
 		self.width = ks.Variable()
 		self.height = ks.Variable()
-		self.width_from = 'none'
-		self.height_from = 'none'
-		self.wid = None
-		self.hid = None
+		self.width_constraint = 'none'
+		self.height_constraint = 'none'
 
 		# Coordinates of the four edges of the element.
 		self.xl = 0.0
@@ -98,16 +179,26 @@ class PlotElement(object):
 		self.parent = None
 		self.children = dict()
 
+	def to_serialised_dict(self):
+		child_labels = []
+		for v in self.children:
+			child_labels.append(v)
+
+		d = {'width': _constraint_serialiser(self.width_constraint),
+			'height': _constraint_serialiser(self.height_constraint),
+			'marginLeft': self.margin_left,
+			'marginRight': self.margin_right,
+			'marginTop': self.margin_top,
+			'marginBottom': self.margin_bottom,
+			'layout': self.layout, 'padding': self.padding,
+			'label': self.label, 'parentLabel':'' if self.parent is None else self.parent.label,
+			'childLabels':child_labels}
+
+		return d
 
 
-
-## ========================================================================
-##
-## CPM Plot
-##
-## ========================================================================
-class Plot(collections.MutableMapping):
-	"""This class does all the layout of a new Zool plot layout.
+class Figure(collections.MutableMapping):
+	"""This class does all the layout of a new Zool figure layout.
 
 	:notes:
 	Figure/element dimensions can be determined by one of the following methods:
@@ -116,17 +207,18 @@ class Plot(collections.MutableMapping):
 		* zool.FromParent: dimensions come from parent elements.
 		* zool.Fill: dimensions are figured out by filling the space.
 		* zool.Named: dimensions are set to those of a named element.
+		* zool.FixedAspect: dimensions have a fixed aspect ratio.
 	"""
 
-	def __init__(self, width=Fixed(0.0), height=Fixed(0.0),
+	def __init__(self, figwidth=Fixed(0.0), figheight=Fixed(0.0),
 					margin_left=0.0, margin_right=0.0,
 					margin_top=0.0, margin_bottom=0.0,
 					layout='vertical', padding=0.0):
 		"""Default constructor.
 
 		Args:
-		:param width: Width of the figure.
-		:param height: Height of the figure.
+		:param figwidth: Width of the figure, base size is adjusted re: margins.
+		:param figheight: Height of the figure, base is adjusted re: margins.
 		:param margin_left float: Width of the margin on the left-hand side [cm].
 		:param margin_right float: Width of the margin on the right-hand side [cm].
 		:param margin_top float: Height of the margin at the top of the plot [cm].
@@ -141,6 +233,9 @@ class Plot(collections.MutableMapping):
 
 		self.label_index = 0
 
+		self.fig_width_constraint = figwidth
+		self.fig_height_constraint = figheight
+
 		# All the plot elements are arranged in a tree structure, built
 		# from a linked list of PlotElement objects. Base is the root of
 		# this tree.
@@ -151,27 +246,29 @@ class Plot(collections.MutableMapping):
 		self.parent = None
 
 		# Set base plot element parameters.
-		if isinstance(width, zool.Fixed):
-			self.solver.addConstraint((self.base.width == width.size) | 'required')
-			self.base.width_from = 'fixed'
-		elif isinstance(width, zool.FromChildren):
-			self.base.width_from = 'children'
-		elif isinstance(width, zool.Named):
-			self.base.width_from = 'named'
-			self.base.wid = width.id
+		if isinstance(figwidth, Fixed):
+			self.solver.addConstraint((self.base.width == figwidth.size -
+									margin_left - margin_right) | 'required')
+		elif isinstance(figwidth, FromChildren):
+			pass
+		elif isinstance(figwidth, Named):
+			pass
 		else:
-			raise ValueError('When setting up a layout, can only choose fixed/children/named width specifier, <{}> is not permitted here.'.format(width))
+			raise InappropriateConstraint(type(figwidth),'base','Figure width setup can only be \
+						constrained using Fixed, FromChildren or Named.')
+		self.base.width_constraint = figwidth
 
-		if isinstance(height, zool.Fixed):
-			self.solver.addConstraint((self.base.height == height.size) | 'required')
-			self.base.height_from = 'fixed'
-		elif isinstance(height, zool.FromChildren):
-			self.base.height_from = 'children'
-		elif isinstance(height, zool.Named):
-			self.base.height_from = 'named'
-			self.base.hid = height.id
+		if isinstance(figheight, Fixed):
+			self.solver.addConstraint((self.base.height == figheight.size -
+									margin_bottom - margin_top) | 'required')
+		elif isinstance(figheight, FromChildren):
+			pass
+		elif isinstance(figheight, Named):
+			pass
 		else:
-			raise ValueError('When setting up a layout, can only choose fixed/children/named height specifier, <{}> is not permitted here.'.format(hfrom))
+			raise InappropriateConstraint(type(figheight),'base','Figure height setup can only be \
+						constrained using Fixed, FromChildren or Named.')
+		self.base.height_constraint = figheight
 
 		self.base.margin_left = margin_left
 		self.base.margin_right = margin_right
@@ -193,6 +290,49 @@ class Plot(collections.MutableMapping):
 		self.figure_width = 0.0
 		self.figure_height = 0.0
 
+	## ------------------------------------------------------------------------
+	## Serialiser to generate json figure configuration.
+	def to_json(self, filename):
+		delements = {}
+		for k,v in self.store.items():
+			if not k=='base':
+				delements[k] = v.to_serialised_dict()
+
+		d = {'figureWidthConstraint': _constraint_serialiser(self.fig_width_constraint),
+			'figureHeightConstraint': _constraint_serialiser(self.fig_height_constraint),
+			'marginLeft': self.base.margin_left,
+			'marginRight': self.base.margin_right,
+			'marginTop': self.base.margin_top,
+			'marginBottom': self.base.margin_bottom,
+			'padding': self.base.padding,
+			'layout': self.base.layout,
+			'elements': delements}
+
+		with open(filename, 'w') as fh:
+			json.dump(d, fh)
+
+	## ------------------------------------------------------------------------
+	## Make new object from json.
+	@staticmethod
+	def from_json(filename):
+		with open(filename, 'r') as fh:
+			d = json.load(fh)
+
+		# TODO: we need to sanity-check the json
+		fig = Figure(figwidth=_constraint_deserialiser(d['figureWidthConstraint']),
+				figheight=_constraint_deserialiser(d['figureHeightConstraint']),
+				margin_left=d['marginLeft'], margin_right=d['marginRight'],
+				margin_top=d['marginTop'], margin_bottom=d['marginBottom'],
+				layout=d['layout'], padding=d['padding'])
+		for k,v in d['elements'].items():
+			fig.add(v['parentLabel'], label=k,
+					width=_constraint_deserialiser(v['width']),
+					height=_constraint_deserialiser(v['height']),
+					padding=v['padding'], layout=v['layout'])
+
+		fig.layout()
+
+		return fig
 
 	## ------------------------------------------------------------------------
 	## Collection iteration methods
@@ -254,7 +394,7 @@ class Plot(collections.MutableMapping):
 		# Generate a label if we need to.
 		self.label_index += 1
 		if label==None:
-			label = 'id_{}'.format(self.label_index)
+			label = 'id_{:2d}'.format(self.label_index)
 
 		# Make the new element.
 		f = PlotElement()
@@ -263,37 +403,37 @@ class Plot(collections.MutableMapping):
 		f.height.setName(label+'-h')
 
 		# Setup the frame.
-		if isinstance(width,zool.Fixed):
+		if isinstance(width,Fixed):
 			self.solver.addConstraint((f.width == width.size) | 'required')
-			f.width_from = 'fixed'
-		elif isinstance(width,zool.FromChildren):
-			f.width_from = 'children'
-		elif isinstance(width,zool.FromParent):
+		elif isinstance(width,FromChildren):
+			pass
+		elif isinstance(width,FromParent):
 			self.solver.addConstraint((f.width == p.width) | 'required')
-			f.width_from = 'parent'
-		elif isinstance(width,zool.Fill):
-			f.width_from = 'fill'
-		elif isinstance(width,zool.Named):
-			f.width_from = 'named'
-			f.wid = width.id
+		elif isinstance(width, FixedAspect):
+			self.solver.addConstraint((f.width == width.aspect*f.height))
+		elif isinstance(width,Fill):
+			pass
+		elif isinstance(width,Named):
+			pass
 		else:
-			raise UserError('Unknown element width specifier <{}>.'.format(wfrom))
+			raise InappropriateConstraint(width,label,'Unknown width constraint.')
+		f.width_constraint = width
 
-		if isinstance(height,zool.Fixed):
+		if isinstance(height,Fixed):
 			self.solver.addConstraint((f.height == height.size) | 'required')
-			f.height_from = 'fixed'
-		elif isinstance(height,zool.FromChildren):
-			f.height_from = 'children'
-		elif isinstance(height,zool.FromParent):
+		elif isinstance(height,FromChildren):
+			pass
+		elif isinstance(height,FromParent):
 			self.solver.addConstraint((f.height == p.height) | 'required')
-			f.height_from = 'parent'
-		elif isinstance(height,zool.Fill):
-			f.height_from = 'fill'
-		elif isinstance(height,zool.Named):
-			f.height_from = 'named'
-			f.hid = height.id
+		elif isinstance(height, FixedAspect):
+			self.solver.addConstraint((f.width == height.aspect*f.height))
+		elif isinstance(height,Fill):
+			pass
+		elif isinstance(height,Named):
+			pass
 		else:
-			raise UserError('Unknown element height specifier <{}>.'.format(hfrom))
+			raise InappropriateConstraint(type(height),label,'Unknown height constraint.')
+		f.height_constraint = height
 
 		if layout=='horizontal':
 			f.layout = 'horizontal'
@@ -370,25 +510,37 @@ class Plot(collections.MutableMapping):
 				hsum = 0.0
 			wfill = []
 			hfill = []
-			for key in f.children:
-				if f.children[key].width_from == 'fixed':
-					wsum += f.children[key].width
-				if f.children[key].height_from == 'fixed':
-					hsum += f.children[key].height
-				if f.children[key].width_from == 'fill':
+			for key, child in f.children.items():
+				if isinstance(child.width_constraint, Fixed):
+					wsum += child.width
+				if isinstance(child.height_constraint, Fixed):
+					hsum += child.height
+
+				if isinstance(child.width_constraint, Fill):
 					wfill.append(key)
-				if f.children[key].height_from == 'fill':
+				if isinstance(child.height_constraint, Fill):
 					hfill.append(key)
-				if f.children[key].width_from == 'children':
-					wsum += f.children[key].width
-				if f.children[key].height_from == 'children':
-					hsum += f.children[key].height
+
+				if isinstance(child.width_constraint, FromChildren):
+					wsum += child.width
+				if isinstance(child.height_constraint, FromChildren):
+					hsum += child.height
+
+				if isinstance(child.width_constraint, FixedAspect):
+					wsum += child.width
+				if isinstance(child.height_constraint, FixedAspect):
+					hsum += child.height
+
+				if isinstance(child.width_constraint, Named):
+					wsum += child.width
+				if isinstance(child.height_constraint, Named):
+					hsum += child.height
 
 			# Add constraints for where we get our width/height from our child nodes.
-			if f.height_from == 'children':
+			if isinstance(f.height_constraint, FromChildren):
 				if f.layout == 'vertical':
 					self.solver.addConstraint((f.height==hsum) | 'required')
-			if f.width_from == 'children':
+			if isinstance(f.width_constraint, FromChildren):
 				if f.layout == 'horizontal':
 					self.solver.addConstraint((f.width==wsum) | 'required')
 
@@ -401,14 +553,15 @@ class Plot(collections.MutableMapping):
 					self.solver.addConstraint((f.children[key].width == (f.width-wsum)/float(len(wfill))) | 'strong')
 
 			# named node
-			if f.width_from == 'named':
-				self.solver.addConstraint((f.width==self.store[f.wid].width) | 'strong')
-			if f.height_from == 'named':
-				self.solver.addConstraint((f.height==self.store[f.hid].height) | 'strong')
+			if isinstance(f.width_constraint, Named):
+				self.solver.addConstraint((f.width==self.store[f.width_constraint.id].width) | 'strong')
+			if isinstance(f.height_constraint, Named):
+				self.solver.addConstraint((f.height==self.store[f.height_constraint.id].height) | 'strong')
 
 			# recursively process child nodes
-			for key in f.children:
-				tr_dimensions(f.children[key])
+			for key, child in f.children.items():
+				tr_dimensions(child)
+
 
 		def tr_coordinates(f):
 			"""Calculate coordinates for a given plot element.
