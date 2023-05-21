@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zool"
+version = "0.2.1"
+description = "Plot layout toolkit"
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [{name = "Chris Arridge", email = "c.arridge@lancaster.ac.uk"}]
+keywords = ["plot", "layout"]
+classifiers = ["Development Status :: 4 - Beta",
+                "Environment :: Console",
+                "Framework :: Matplotlib",
+                "Intended Audience :: Developers",
+                "Intended Audience :: Science/Research",
+                "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+                "Programming Language :: Python :: 3.8",
+                "Programming Language :: Python :: 3.9",
+                "Programming Language :: Python :: 3.10",
+                "Programming Language :: Python :: 3.11",
+                "Natural Language :: English",
+                "Topic :: Scientific/Engineering :: Visualization",
+                "Topic :: Software Development :: Libraries :: Python Modules"]
+dependencies = [
+        'numpy',
+        'matplotlib',
+        'kiwisolver'
+        ]
+
+[project.urls]
+"Homepage" = "https://github.com/chrisarridge/zool"
+"Repository" = "https://github.com/chrisarridge/zool"
+"Bug Tracker" = "https://github.com/chrisarridge/zool/issues"
+
+[tool.setuptools.packages.find]
+where = ["source"]
+include = ["zool"]
+exclude = []
+
