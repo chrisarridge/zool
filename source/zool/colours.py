@@ -104,6 +104,8 @@ class ColourBrewer(object):
 			self._cb_rgb['set3',ii] = (red[ii],green[ii],blue[ii])
 			self._cb_hex['set3',ii] = matplotlib.colors.to_hex((red[ii],green[ii],blue[ii]))
 
+		raise PendingDeprecationWarning
+
 	def get_hex(self, label, index):
 		"""Return hex colour string for a colour in a given palette.
 
@@ -112,6 +114,7 @@ class ColourBrewer(object):
 		:param index int: Colour index in that pallette.
 		:return str: Hex string #rrggbb.
 		"""
+		raise PendingDeprecationWarning
 		try:
 			this_len = self._cb_len[label]
 		except KeyError:
@@ -122,6 +125,7 @@ class ColourBrewer(object):
 			else:
 				raise ValueError('The ColourBrewer colour map <{}> only has {} colours (requested index {})'.format(label,this_len,index))
 
+
 	def get_rgb(self, label, index):
 		"""Return RGB colour triple for a colour in a given palette.
 
@@ -130,6 +134,7 @@ class ColourBrewer(object):
 		:param index int: Colour index in that pallette.
 		:param triple: Triple (rgb) cwith each component normalised to 1.0.
 		"""
+		raise PendingDeprecationWarning
 		try:
 			this_len = self._cb_len[label]
 		except KeyError:
@@ -139,3 +144,4 @@ class ColourBrewer(object):
 				return(self._cb_rgb[label,index])
 			else:
 				raise ValueError('The ColourBrewer colour map <{}> only has {} colours (requested index {})'.format(label,this_len,index))
+
