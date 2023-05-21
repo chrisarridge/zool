@@ -1,5 +1,9 @@
 # Version history
 
+## 2.1 - Chris Arridge - 21 May 2023
+* Changed install to use pyproject TOML.
+* Moved colours to pending deprecated status since this functionality is in Matplotlib.
+
 ## 2.0a - Chris Arridge - 11 February 2020
 * Added FixedAspect setting to allow the solver to satisfy constraints on the
 aspect ratio of a given panel (e.g., for equal axes).

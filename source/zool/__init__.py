@@ -4,12 +4,12 @@
 ##
 ## ==========================================================================
 __author__ = "Chris Arridge/Lancaster University"
-__copyright__ = "Copyright 2017-2019 Lancaster University"
-__version__ = "2.0"
+__copyright__ = "Copyright 2017-2023 Lancaster University"
+__version__ = "2.1"
 __email__ = "c.arridge@lancaster.ac.uk"
-__status__ = "alpha"
-__date__ = "11 January 2020"
-__docformat__ = "reStructuredText"
+__status__ = "beta"
+__date__ = "11 January 2023"
+__docformat__ = "numpy"
 
 from .core import *
 from .factory import *
