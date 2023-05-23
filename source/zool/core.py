@@ -19,126 +19,10 @@ import zool.colours
 
 ## ========================================================================
 ##
-## Layout sizing types.
-##
-## ========================================================================
-class Fixed:
-	def __init__(self, s):
-		self._size = s
-	@property
-	def size(self):
-		return self._size
-
-class FixedAspect:
-	def __init__(self, s):
-		self._aspect = s
-	@property
-	def aspect(self):
-		return self._aspect
-
-class FromChildren:
-	def __init__(self):
-		pass
-
-class FromParent:
-	def __init__(self):
-		pass
-
-class Fill:
-	def __init__(self):
-		pass
-
-class Named:
-	def __init__(self, id):
-		self._id = id
-
-	@property
-	def id(self):
-		return self._id
-
-def _constraint_serialiser(v):
-	"""Helper function to turn constraints into something that can be serialised"""
-	if isinstance(v, Fixed):
-		return {'constraint':'fixedDimension', 'value':v.size}
-	elif isinstance(v, FixedAspect):
-		return {'constraint':'fixedAspectRatio', 'value':v.aspect}
-	elif isinstance(v, FromChildren):
-		return {'constraint':'fromChildren'}
-	elif isinstance(v, FromParent):
-		return {'constraint':'fromParent'}
-	elif isinstance(v, Fill):
-		return {'constraint':'fill'}
-	elif isinstance(v, Named):
-		return {'constraint':'named', 'value':v.id}
-	else:
-		raise ValueError('Unknown constraint type')
-
-
-
-def _constraint_deserialiser(v):
-	"""Helper function to turn serialised constraints back into constraints"""
-	if not isinstance(v, dict):
-		raise ValueError('Supplied variable is not a dictionary')
-	if 'constraint' not in v:
-		raise ValueError('Supplied dictionary does not have a "constraint" entry')
-
-	if v['constraint']=='fixedDimension':
-		if 'value' not in v:
-			raise ValueError('Require a value for a fixedDimension constraint')
-		else:
-			return Fixed(float(v['value']))
-	elif v['constraint']=='fixedAspectRatio':
-		if 'value' not in v:
-			raise ValueError('Require a value for a fixedAspectRatio constraint')
-		else:
-			return FixedAspect(float(v['value']))
-	elif v['constraint']=='named':
-		if 'value' not in v:
-			raise ValueError('Require a panel id for a named width/height constraint')
-		else:
-			return Named(v['value'])
-	elif v['constraint']=='fill':
-		return Fill()
-	elif v['constraint']=='fromChildren':
-		return FromChildren()
-	elif v['constraint']=='fromParent':
-		return FromParent()
-	else:
-		raise UserError('Unknown constraint type <{}>'.format(v['constraint']))
-
-
-## ========================================================================
-##
-## Exceptions
-##
-## ========================================================================
-class ZoolError(Exception):
-	"""Base class for Zool exceptions."""
-	pass
-
-class InappropriateConstraint(ZoolError):
-	"""Exception raised for errors in the constraints provided.
-
-	Attributes:
-		:param: constraint str: Constraint provided.
-		:param: label str: Label that the constraint was provided to
-		:param: message str: Message.
-	"""
-
-	def __init__(self, constraint, label, message):
-		self.constraint = constraint
-		self.label = label
-		self.message = message
-
-
-
-
-## ========================================================================
-##
 ## Plot element that makes up part of a plot.
 ##
 ## ========================================================================
-class PlotElement(object):
+class PlotElement:
 	"""This class implements a core element of a Zool plot layout."""
 
 	def __init__(self):
@@ -155,8 +39,8 @@ class PlotElement(object):
 		# the dimension information originates.
 		self.width = ks.Variable()
 		self.height = ks.Variable()
-		self.width_constraint = 'none'
-		self.height_constraint = 'none'
+		self.width_constraint = None
+		self.height_constraint = None
 
 		# Coordinates of the four edges of the element.
 		self.xl = 0.0
@@ -166,7 +50,7 @@ class PlotElement(object):
 
 		# Layout control information: How does this element lay out its child
 		# elements, by row or column? What padding is there between elements?
-		self.layout = 'none'
+		self.layout = None
 		self.padding = 0.0
 
 		# Label for this element.
