@@ -13,4 +13,4 @@ __docformat__ = "numpy"
 
 from .core import *
 from .factory import *
-from .decor import *
+from .constraints import Fixed, FixedAspect, FromChildren, FromParent, Fill, Named
