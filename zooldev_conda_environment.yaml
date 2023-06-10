@@ -1,0 +1,9 @@
+name: zooldev
+
+dependencies:
+  - python=3.8
+  - ipython
+  - matplotlib
+  - pip
+  - pip:
+    - -e ./
