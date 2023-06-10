@@ -4,3 +4,4 @@ __pycache__
 source/zool/Zool.egg-info/
 source/zool.egg-info/
 source/zool/__pycache__/
+docs/build/
