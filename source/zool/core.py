@@ -1,6 +1,7 @@
 """ Core definitions.
 """
-from typing import Union,Tuple,Dict,Iterable
+from __future__ import annotations
+from typing import Union,Tuple,Dict,Iterable,TypeVar,Type
 import collections
 import uuid
 import itertools
@@ -506,15 +507,15 @@ class PlotElement:
         """
         return self._children.__iter__
 
-    def to_serialised_dict(self) -> dict:
+    def to_dict(self) -> dict:
         """Serialise this plot element to a dictionary.
 
         Returns
         -------
         dict
         """
-        d = {'width': _constraint_serialiser(self._width_constraint),
-            'height': _constraint_serialiser(self._height_constraint),
+        d = {'widthConstraint': self._width_constraint.to_dict(),
+            'heightConstraint': self._height_constraint.to_dict(),
             'marginLeft': self._margin_left,
             'marginRight': self._margin_right,
             'marginTop': self._margin_top,
@@ -524,6 +525,9 @@ class PlotElement:
             'childLabels': self._children}
         return d
 
+
+
+_T = TypeVar("_T")
 
 
 class Layout:
@@ -1075,49 +1079,149 @@ class Layout:
             raise NoSolution("Cannot create the axes since the layout has not been solved and so the width, height and position are unknown")
 
         if self[id].axes is None:
-            raise UserError("This PlotElement doesn't have an axis to reset")
-
-        self[id].axes.set_position([self[id].x_left.value()/self["base"].width.value(),
+            warnings.warn("This PlotElement doesn't have an axis to reset - creating the axis")
+            self.axes(id)
+        else:
+            self[id].axes.set_position([self[id].x_left.value()/self["base"].width.value(),
                                                 self[id].y_bottom.value()/self["base"].height.value(),
                                                 self[id].width.value()/self["base"].width.value(),
                                                 self[id].height.value()/self["base"].height.value()])
 
 
-    # def to_json(self, filename: str):
-    #     """Serialise this Layout to a JSON file.
+    def to_dict(self) -> dict:
+        """Convert this Layout, and all the PlotElements and their constraints to a dictionary
 
-    #     Parameters
-    #     ----------
-    #     filename : str
-    #         Filename to write to, if the filename doesn't end in .json then this will be appended.
-    #     """
-    #     d = {"zoolElements": {k: v.to_serialised_dict() for k,v in self._elements.items()}}
-    #     with open(filename if filename[-5:]==".json" else filename+".json", 'w') as fh:
-    #         json.dump(d, fh)
+        Returns
+        -------
+        dict
+        """
+        d = {"zool":{"version":"ver",
+                     "solved":self._solved,
+                     "plotElements":{k: v.to_dict() for k,v in self._elements.items()}}}
 
+        return d
 
-    # @classmethod
-    # def from_json(cls, filename):
+    def to_json(self, **kwargs) -> str:
+        """Serialise this Layout to a JSON string.
 
-    #     with open(filename, 'r') as fh:
-    #         d = json.load(fh)
+        Parameters
+        ----------
+        Any keyword arguments are passed onto the JSON serialiser.
 
-    #     # Firstly, find the base and construct the layout object.
-    #     layout = cls(figwidth=_constraint_deserialiser(d["zoolElements"]["base"]["widthConstraint"]))
+        Returns
+        -------
+        str
+            String of JSON.
+        """
+        d = self.to_dict()
+        return json.dumps(d, **kwargs)
 
+    def save(self, filename: str, **kwargs):
+        """Serialise this Layout to a JSON file.
 
-	# 	# TODO: we need to sanity-check the json
-	# 	fig = Figure(figwidth=_constraint_deserialiser(d['figureWidthConstraint']),
-	# 			figheight=_constraint_deserialiser(d['figureHeightConstraint']),
-	# 			margin_left=d['marginLeft'], margin_right=d['marginRight'],
-	# 			margin_top=d['marginTop'], margin_bottom=d['marginBottom'],
-	# 			layout=d['layout'], padding=d['padding'])
-	# 	for k,v in d['elements'].items():
-	# 		fig.add(v['parentLabel'], label=k,
-	# 				width=_constraint_deserialiser(v['width']),
-	# 				height=_constraint_deserialiser(v['height']),
-	# 				padding=v['padding'], layout=v['layout'])
+        Parameters
+        ----------
+        filename : str
+            Filename to write to, if the filename doesn't end in .json then this will be appended.
+        Any keyword arguments are passed onto the JSON serialiser.
+        """
 
-	# 	fig.layout()
+        d = self.to_dict()
+        with open(filename if filename[-5:]==".json" else filename+".json", 'w') as fh:
+            json.dump(d, fh, **kwargs)
+        d = {"zool":{"version":"ver",
+                     "solved":self._solved,
+                     "plotElements":{k: v.to_dict() for k,v in self._elements.items()}}}
 
-	# 	return fig
+    @classmethod
+    def from_json(cls: Type[_T], json_string: str) -> _T:
+        """Deserialise JSON string to create a new Layout and set of PlotElement objects.
+
+        Parameters
+        ----------
+        cls : Type[_T]
+            Layout object.
+        json_string : str
+            String of JSON to deserialise.
+
+        Returns
+        -------
+        _T
+            Layout object.
+        """
+
+        def recursively_parse(layout: Type[_T], elements: dict, parentId: str):
+            """Recursively add all the child elements of a given id.
+
+            Parameters
+            ----------
+            layout : Type[_T]
+                Layout object.
+            elements : dict
+                Dictionary of serialised PlotElements.
+            parentId : _type_
+                Parent id of the child elements to add.
+            """
+            for childId in elements[parentId]["childLabels"]:
+                layout[parentId,childId] = PlotElement(
+                        width=constraint_deserialiser(elements[childId]["widthConstraint"]),
+                        height=constraint_deserialiser(elements[childId]["heightConstraint"]),
+                    margin_left=elements[childId]["marginLeft"],
+                    margin_right=elements[childId]["marginRight"],
+                    margin_top=elements[childId]["marginTop"],
+                    margin_bottom=elements[childId]["marginBottom"],
+                    layout=elements[childId]["childLayoutDirection"],
+                    padding=elements[childId]["childPadding"])
+
+            for childId in elements[parentId]["childLabels"]:
+                if len(elements[childId]["childLabels"])>0:
+                    recursively_parse(layout, elements, childId)
+
+        # Parse the JSON into a dictionary.
+        d = json.loads(json_string)
+
+        # Make sure this is a Zool dictionary.
+        if "zool" not in d:
+            raise DeserialisationError("Not a zool JSON (missing <zool> key)")
+        if "plotElements" not in d["zool"]:
+            raise DeserialisationError("No PlotElements in JSON")
+        if not isinstance(d["zool"]["plotElements"], dict):
+            raise DeserialisationError("Container of PlotElements is not a dictionary")
+
+        # Find the base and construct the layout object.
+        # NOTE: there is no type checking on the margins, padding, layout.
+        elements = d["zool"]["plotElements"]
+        layout = cls(figwidth=constraint_deserialiser(elements["base"]["widthConstraint"]),
+                    figheight=constraint_deserialiser(elements["base"]["heightConstraint"]),
+                    margin_left=elements["base"]["marginLeft"],
+                    margin_right=elements["base"]["marginRight"],
+                    margin_top=elements["base"]["marginTop"],
+                    margin_bottom=elements["base"]["marginBottom"],
+                    layout=elements["base"]["childLayoutDirection"],
+                    padding=elements["base"]["childPadding"])
+
+        # Recursively add all the child elements, solve the layout and return.
+        recursively_parse(layout, elements, "base")
+        layout.layout()
+        return layout
+
+    @classmethod
+    def load(cls: Type[_T], filename: str) -> _T:
+        """Load JSON from a file and then deserialise to create a new Layout object.
+
+        Parameters
+        ----------
+        cls : Type[_T]
+            Layout object.
+        filename : str
+            Filename of JSON to load.
+
+        Returns
+        -------
+        _T
+            Layout object.
+        """
+        with open(filename, "r") as fh:
+            d = json.load(fh)
+
+        return self.from_json(d)
