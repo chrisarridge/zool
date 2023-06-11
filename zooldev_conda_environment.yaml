@@ -4,6 +4,8 @@ dependencies:
   - python=3.8
   - ipython
   - matplotlib
+  - sphinx
+  - sphinx_rtd_theme
   - pip
   - pip:
     - -e ./
