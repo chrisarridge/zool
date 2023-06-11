@@ -1,8 +1,14 @@
-/examples/*.pdf
+/examples/*.png
 /examples/*.json
+/examples/simple_vertical_stack.json
+/examples/simple_vertical_stack.png
+simple_vertical_stack.json
+simple_vertical_stack.png
+
 __pycache__
+
+source/zool/__pycache__/
 source/zool/Zool.egg-info/
 source/zool.egg-info/
-source/zool/__pycache__/
+
 docs/build/
-simple_vertical_stack.json
