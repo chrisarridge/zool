@@ -1224,4 +1224,4 @@ class Layout:
         with open(filename, "r") as fh:
             d = json.load(fh)
 
-        return self.from_json(d)
+        return cls.from_json(d)
