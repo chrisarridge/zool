@@ -16,6 +16,15 @@ class Fixed:
     """
     size: float
 
+    def to_dict(self) -> dict:
+        """Convert this constraint into a dictionary
+
+        Returns
+        -------
+        dict
+        """
+        return {"constraint":"fixed","size":self.size}
+
 
 
 @dataclass
@@ -29,26 +38,57 @@ class FixedAspect:
     """
     aspect: float
 
+    def to_dict(self) -> dict:
+        """Convert this constraint into a dictionary
+
+        Returns
+        -------
+        dict
+        """
+        return {"constraint":"fixedAspect","aspect":self.aspect}
+
 
 
 class FromChildren:
     """Class to store a constraint where the width or height comes from any child elements.
     """
-    pass
 
+    def to_dict(self) -> dict:
+        """Convert this constraint into a dictionary
+
+        Returns
+        -------
+        dict
+        """
+        return {"constraint":"fromChildren"}
 
 
 class FromParent:
     """Class to store a constraint where the width or height comes from the parent element.
     """
-    pass
 
+    def to_dict(self) -> dict:
+        """Convert this constraint into a dictionary
+
+        Returns
+        -------
+        dict
+        """
+        return {"constraint":"fromParent"}
 
 
 class Fill:
     """Class to store a constraint where the width or height fills any remaining space in the parent element.
     """
-    pass
+
+    def to_dict(self) -> dict:
+        """Convert this constraint into a dictionary
+
+        Returns
+        -------
+        dict
+        """
+        return {"constraint":"fill"}
 
 
 
@@ -63,44 +103,19 @@ class Named:
     """
     id: str
 
+    def to_dict(self) -> dict:
+        """Convert this constraint into a dictionary
 
-def _constraint_serialiser(v: Union[Fixed,FixedAspect,FromChildren,FromParent,Fill,Named]) -> dict:
-    """Helper function to turn constraints into something that can be serialised.
-
-    Parameters
-    ----------
-    v : Union[Fixed,FixedAspect,FromChildren,FromParent,Fill,Named]
-        Constraint to serialise.
-
-    Returns
-    -------
-    dict
-        Serialised version.
-
-    Raises
-    ------
-    TypeError
-        Raised if the constraint type is not recognised.
-    """
-    if isinstance(v, Fixed):
-        return {"constraint":"fixedDimension", "value":v.size}
-    elif isinstance(v, FixedAspect):
-        return {"constraint":"fixedAspectRatio", "value":v.aspect}
-    elif isinstance(v, FromChildren):
-        return {"constraint":"fromChildren"}
-    elif isinstance(v, FromParent):
-        return {"constraint":"fromParent"}
-    elif isinstance(v, Fill):
-        return {"constraint":"fill"}
-    elif isinstance(v, Named):
-        return {"constraint":"named", "value":v.id}
-    else:
-        raise TypeError("Unknown constraint type")
+        Returns
+        -------
+        dict
+        """
+        return {"constraint":"named", "id":self.id}
 
 
 
-def _constraint_deserialiser(v: dict) -> Union[Fixed,FixedAspect,FromChildren,FromParent,Fill,Named]:
-    """Helper function to turn serialised constraints back into constraints
+def constraint_deserialiser(v: dict) -> Union[Fixed,FixedAspect,FromChildren,FromParent,Fill,Named]:
+    """Factory function to turn serialised constraints back into constraints
 
     Parameters
     ----------
@@ -125,20 +140,20 @@ def _constraint_deserialiser(v: dict) -> Union[Fixed,FixedAspect,FromChildren,Fr
     if "constraint" not in v:
         raise DeserialisationError("Unknown","Supplied dictionary does not have a <constraint> entry")
 
-    if v["constraint"]=="fixedDimension":
-        if "value" not in v:
-            raise DeserialisationError("Fixed","Require a value for a fixedDimension constraint")
-        return Fixed(float(v["value"]))
+    if v["constraint"]=="fixed":
+        if "size" not in v:
+            raise DeserialisationError("Fixed","Require a value for a fixed constraint")
+        return Fixed(float(v["size"]))
 
-    elif v["constraint"]=="fixedAspectRatio":
-        if "value" not in v:
-            raise DeserialisationError("FixedAspect","Require a value for a fixedAspectRatio constraint")
-        return FixedAspect(float(v["value"]))
+    elif v["constraint"]=="fixedAspect":
+        if "aspect" not in v:
+            raise DeserialisationError("FixedAspect","Require a value for a fixedAspect constraint")
+        return FixedAspect(float(v["aspect"]))
 
     elif v["constraint"]=="named":
-        if "value" not in v:
+        if "id" not in v:
             raise DeserialisationError("Named","Require a panel id for a named width/height constraint")
-        return Named(v["value"])
+        return Named(v["id"])
 
     elif v["constraint"]=="fill":
         return Fill()
