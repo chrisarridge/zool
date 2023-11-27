@@ -1,9 +1,12 @@
 """Exceptions class definitions.
 """
 
+
 class ZoolError(Exception):
     """Base class for Zool exceptions."""
+
     pass
+
 
 class InappropriateConstraint(ZoolError):
     """Exception raised for errors in the constraints.
@@ -36,8 +39,9 @@ class InappropriateConstraint(ZoolError):
 
 
 class NoSolution(ZoolError):
-    """Exception raised where the user has tried to generate axes that have not been solved.
-    """
+    """No layout solution available."""
+
+    pass
 
 
 class UnknownElement(ZoolError):
@@ -59,7 +63,6 @@ class UnknownElement(ZoolError):
             The id that was unknown.
         """
         self.id = id
-
 
 
 class DeserialisationError(ZoolError):
