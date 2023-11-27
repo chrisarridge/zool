@@ -15,8 +15,8 @@ from .constraints import (
     FromParent,
     Named,
 )
-from .core import PlotElement, Layout
-from .factory import vertical_stack, triangle, triangle_equal, subplot
+from .core import Layout, PlotElement
+from .factory import subplot, triangle, triangle_equal, vertical_stack
 
 __all__ = [
     "Fill",
