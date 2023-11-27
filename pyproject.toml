@@ -39,3 +39,10 @@ where = ["source"]
 include = ["zool"]
 exclude = []
 
+[tool.isort]
+profile = "black"
+src_paths = ["source","examples","tests"]
+
+[tool.black]
+line-length = 79
+include = '\.pyi?$'
